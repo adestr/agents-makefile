@@ -10,7 +10,7 @@ The workflow is a Makefile-style DAG. The active target is `finish` unless the h
 4. A human gate is satisfied only when the human's latest message explicitly approves the artifact that gate presented. Approval of a different gate does not count. If the human asks for a change, that gate is unsatisfied and the target that produced the artifact is unsatisfied too.
 5. Do not add a target, skip a target, or choose a different unsatisfied prerequisite than the leftmost one.
 6. Lines under a target are instructions. A line in backticks is a command.
-7. Do not commit, push, merge, check out another branch, or delete branches except where `branch-created`, `commit`, `push`, `land`, or `pristine-workbench` says to.
+7. Do not commit, push, merge, check out another branch, or delete branches except where `branch-created`, `main-tests-green`, `commit`, `push`, `land`, or `pristine-workbench` says to.
 8. If a recipe says a scar ledger, changelog, CI workflow, or review bot is absent, record that and finish the step. Do not create that system in order to satisfy the step.
 
 Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adversarial-review`, and `clean-static-analysis`.
@@ -21,11 +21,11 @@ Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adve
 .PHONY: finish pristine-workbench codified-scars-consolidated land \
 	human-landing-approval ready-to-land ci-quiescent changelog-updated \
 	ci-remote-green all-bots-triaged push human-push-approval commit \
-	human-commit-approval pre-commit-clean approved-adversarial-report \
+	human-commit-approval pre-commit-tests-pass pre-commit-clean approved-adversarial-report \
 	clean-static-analysis doc-audit-complete human-review-approval \
 	triaged-blockers adversarial-review human-diff-approval \
-	implementation-diff tdd-failing-repro approved-plan human-plan-approval \
-	researched-ticket branch-created candidate-scars git-archaeology ticket-assigned
+	implementation-diff tdd-failing-repro baseline-tests-pass approved-plan human-plan-approval \
+	researched-ticket branch-created candidate-scars git-archaeology main-tests-green ticket-assigned
 
 finish: pristine-workbench
 pristine-workbench: codified-scars-consolidated
@@ -39,7 +39,8 @@ all-bots-triaged: push
 push: human-push-approval
 human-push-approval: commit
 commit: human-commit-approval
-human-commit-approval: pre-commit-clean
+human-commit-approval: pre-commit-tests-pass
+pre-commit-tests-pass: pre-commit-clean
 pre-commit-clean: approved-adversarial-report clean-static-analysis doc-audit-complete
 approved-adversarial-report: human-review-approval
 human-review-approval: triaged-blockers
@@ -57,21 +58,47 @@ git-archaeology: branch-created
 clean-static-analysis: human-diff-approval
 doc-audit-complete: human-diff-approval
 changelog-updated: human-diff-approval
-ticket-assigned:
+ticket-assigned: main-tests-green
+main-tests-green:
 ```
 
 ## Workflow Steps
 
 ```makefile
+baseline-tests-pass:
+	From the repository root, run every full test suite this repository already defines.
+	If `package.json` defines a `test` script, run `pnpm test`.
+	If a `*.sln` file exists, run `dotnet test`.
+	If both apply, run both.
+	If neither applies, say "no test command" and stop. Do not add a test runner, a `test` script, or a solution file.
+	Satisfied when: every command that applied exited 0, or "no test command" is stated.
+
+main-tests-green:
+	Read the combined commit status of remote `main` with `gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" /repos/{owner}/{repo}/commits/main/status`.
+	`{owner}` and `{repo}` are the repository of the current directory.
+	`state` is `success` when the latest status for every context is `success`.
+	`state` is `failure` when any context is `error` or `failure`.
+	`state` is `pending` when there are no statuses or a context is `pending`.
+	If `state` is `success`, this target is satisfied.
+	If `state` is `failure`, those statuses are a regression.
+	If `state` is `pending`, or that command exits non-zero, run the commands in `baseline-tests-pass` from the repository root.
+	When the worktree has no uncommitted changes, check out `main` and run `git pull` before that local run.
+	If those commands do not apply, say "no test command".
+	If a local command fails, those failures are a regression.
+	When there is a regression, if an open issue already records these failures, that issue is the ticket. Otherwise create an issue that quotes the failing status contexts, or the failing command and its output. If the repo has a `regression` label, apply it; otherwise apply `bug` if that label exists. Do not create a label. Tell the human that this issue is the ticket for this run, in place of the request that started the run.
+	This target checks remote `main`. It does not check an existing feature branch.
+	Satisfied when: `state` is `success`, or every local command that applied exited 0, or "no test command" is stated, or the regression issue is the ticket and the human has been told that.
+
 ticket-assigned:
-	Restate the human's requested outcome in one sentence, including what will be different when the work is done.
-	The human's message is the ticket when it names that outcome. Do not invent a tracker id.
-	Satisfied when: that sentence is stated and it matches the human's request.
+	Restate the requested outcome in one sentence, including what will be different when the work is done.
+	If `main-tests-green` named a regression issue, that issue is the ticket.
+	Otherwise the human's message is the ticket when it names that outcome. Do not invent a tracker id.
+	Satisfied when: that sentence is stated and it matches the ticket.
 
 branch-created:
 	Name the working branch `[prefix]/[issue number]-[terse kebab-case issue summary]`.
-	Use the prefix `fix` when the issue is labelled `bug`, and `feat` otherwise.
-	Take the issue number, title, and labels from the issue the human named. Do not invent an issue number.
+	Use the prefix `fix` when the issue is labelled `bug` or `regression`, and `feat` otherwise.
+	Take the issue number, title, and labels from the issue the human named. The issue named by `main-tests-green` counts as that issue. Do not invent an issue number.
 	If the current branch already has that name, stop.
 	If that branch exists, check it out.
 	Otherwise check out `main`, run `git pull`, and create the branch from `main`.
@@ -104,11 +131,11 @@ approved-plan:
 	If the plan must change, `human-plan-approval` is unsatisfied until the human accepts the revised plan.
 
 tdd-failing-repro:
-	If the accepted plan changes runtime behavior, add a test that fails because that behavior is missing. Do not edit production code in this step.
-	Run the narrowest existing command that executes that test: `dotnet test` from `instrumentation/` for C# tests, or `pnpm test` from `ui/` for panel tests.
-	Show the failing assertion.
 	If the accepted plan changes no runtime behavior, add no test. Say "no runtime behavior; no test added".
-	Satisfied when: the new test's failure output is shown, or "no runtime behavior; no test added" is stated.
+	If the commands in `baseline-tests-pass` do not apply, add no test. Say "no test command; no test added".
+	If the accepted plan changes runtime behavior, add a test that fails because that behavior is missing. Do not edit production code in this step.
+	Run the commands from `baseline-tests-pass` and show the failing assertion of the new test.
+	Satisfied when: the new test's failure output is shown, or "no test command; no test added" is stated, or "no runtime behavior; no test added" is stated.
 
 implementation-diff:
 	Change only the files named in the accepted plan, and only enough to make the failing test pass or to apply the docs-only plan.
@@ -160,13 +187,13 @@ approved-adversarial-report:
 
 clean-static-analysis:
 	Run only the checks for files in the approved diff.
-	If the diff includes `*.cs` or `*.csproj`, run `dotnet test` from `instrumentation/`.
-	If the diff includes files under `ui/`, run `pnpm lint` from the repository root.
+	If the diff includes `*.cs` or `*.csproj`, run `dotnet format` from the repository root.
+	If `./package.json` defines a 'lint' script, run `pnpm lint` from the repository root.
 	If the diff includes neither, say "no code files; no static check".
 	Satisfied when: each command you were required to run exited 0, or "no code files; no static check" is stated.
 
 doc-audit-complete:
-	Read `README.md`, `instrumentation/README.md`, and `ui/README.md`.
+	Read `README.md` and any other markdown files which are linked to from `README.md`.
 	If the approved diff changes behavior that one of those files already describes, update that file so the description matches the diff.
 	If none of them describe the changed behavior, say which files you read and that none describe it. Do not add a new document.
 	Satisfied when: those descriptions match the diff, or you have stated that none of them cover it.
@@ -175,6 +202,12 @@ pre-commit-clean:
 	Run `git status` and `git diff`.
 	Confirm the tree contains only the approved diff, the test from `tdd-failing-repro`, doc fixes from `doc-audit-complete`, and blocker fixes.
 	Satisfied when: that is all `git status` shows, and `clean-static-analysis` and `doc-audit-complete` are satisfied.
+
+pre-commit-tests-pass:
+	Run the same commands as `baseline-tests-pass`.
+	If any command fails, fix the failure on this branch. That edit unsatisfies `human-diff-approval`.
+	If the commands in `baseline-tests-pass` do not apply, say "no test command".
+	Satisfied when: every command that applied exited 0, or "no test command" is stated.
 
 human-commit-approval:
 	Show `git status` and the proposed commit message. The message states why the change was made.
