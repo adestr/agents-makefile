@@ -1,3 +1,6 @@
+<!-- This workflow is automatically inserted into your AGENTS.md file, please do not edit it directly -->
+<!-- To update the workflow, run `make workflow` inside ./agent-workflow -->
+
 # Agent Workflow
 
 The workflow is a Makefile-style DAG. The active target is `finish` unless the human names another target from this file.
@@ -233,6 +236,7 @@ ci-remote-green:
 	Satisfied when: every required check has succeeded, or "no remote CI checks" is stated.
 
 all-bots-triaged:
+	A bot review has been requested when the pull request timeline contains a `review_requested` event for that bot. An empty `reviewRequests` list does not clear that request. `copilot_work_started` means that review is still outstanding.
 	If a pull request exists and a bot review has been requested but not submitted, wait until that review is submitted. Do not say "no bot comments" while that request is outstanding.
 	If a pull request exists, read each review comment left by a bot.
 	For each comment, either fix it or record a one-line reason it is deferred. A fix makes `human-diff-approval` unsatisfied; repeat from that gate.
@@ -261,9 +265,12 @@ human-landing-approval:
 land:
 	Open or update the pull request. Include `Closes #[id]` in the body, where `[id]` is the issue number the human named.
 	If this step opened the pull request, run `sleep 5` before checking for review requests, so an automatic request has time to appear.
+	Just before merge, after the pull request's checks have finished, read the pull request timeline.
+	If that timeline has a `review_requested` event for a bot and that bot has not submitted its review, wait for the review.
 	Apply `all-bots-triaged` to that pull request. Do not merge while it is unsatisfied.
+	If the timeline has no `review_requested` event, do not wait for a review to appear.
 	Then merge the pull request into `main` using the path the human approved.
-	Satisfied when: the commit from `commit` is contained in `main`, or the pull request into `main` has been merged by squash or rebase, and every bot comment that was present before the merge was fixed or deferred.
+	Satisfied when: the commit from `commit` is contained in `main`, or the pull request into `main` has been merged by squash or rebase, and every bot review requested on the timeline before the merge was submitted and its comments were fixed or deferred.
 
 codified-scars-consolidated:
 	This step records a new failure mode from the work just finished. It does not introduce a scar practice into a repository that has none.
