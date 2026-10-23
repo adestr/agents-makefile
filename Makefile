@@ -18,7 +18,7 @@ workflow:
 	parent=$$(dirname "$$this_top"); \
 	if [ -z "$$super" ]; then \
 		echo "❌ This checkout is not a git submodule. Refusing to write ../AGENTS.md."; \
-		echo "   From the parent repository: git submodule add https://www.github.com/adestr/agents-makefile agents-makefile"; \
+		echo "   From the parent repository: git submodule add https://github.com/adestr/agents-makefile"; \
 		exit 1; \
 	fi; \
 	if [ "$$super" != "$$parent" ]; then \
