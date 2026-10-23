@@ -34,18 +34,17 @@ workflow:
 		exit 1; \
 	fi
 
-	@ensure_trailing_newline() { \
+	@if [ ! -f "$(AGENTS_FILE)" ]; then \
+		echo "📄 Creating AGENTS.md..."; \
+		printf '%s\n' "$(MARKER_OPEN)" "$(MARKER_CLOSE)" > $(AGENTS_FILE); \
+	fi; \
+	ensure_trailing_newline() { \
 		file="$$1"; \
 		if [ -s "$$file" ] && [ "$$(tail -c 1 "$$file" 2>/dev/null | od -An -t x1 | tr -d ' \n')" != "0a" ]; then \
 			printf '\n' >> "$$file"; \
 		fi; \
 	}; \
-	if [ ! -f "$(AGENTS_FILE)" ]; then \
-		echo "📄 Creating AGENTS.md..."; \
-		printf '%s\n' "$(MARKER_OPEN)" "$(MARKER_CLOSE)" > $(AGENTS_FILE); \
-	fi
-
-	@OPEN_COUNT=$$(grep -F -c -x "$(MARKER_OPEN)" $(AGENTS_FILE) || true); \
+	OPEN_COUNT=$$(grep -F -c -x "$(MARKER_OPEN)" $(AGENTS_FILE) || true); \
 	CLOSE_COUNT=$$(grep -F -c -x "$(MARKER_CLOSE)" $(AGENTS_FILE) || true); \
 	if [ "$$OPEN_COUNT" -ne "$$CLOSE_COUNT" ] || [ "$$OPEN_COUNT" -gt 1 ]; then \
 		echo "⚠️  Malformed markers detected — repairing..."; \
