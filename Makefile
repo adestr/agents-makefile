@@ -1,9 +1,11 @@
 # Path to the shared workflow file inside your submodule
 WORKFLOW_FILE := workflow.md
 
-# AGENTS.md in the parent repository. This checkout must be a submodule
-# sitting directly in that repository's working tree.
-AGENTS_FILE := ../AGENTS.md
+# Resolve the parent repository root dynamically instead of assuming this
+# submodule sits one directory below the repo root. A superproject may be
+# absent, so we must check for an actual non-empty value before falling back.
+SUPERPROJECT_ROOT := $(shell out=$$(git rev-parse --show-superproject-working-tree 2>/dev/null); if [ -n "$$out" ]; then printf '%s' "$$out"; elif out=$$(git rev-parse --show-toplevel 2>/dev/null); then printf '%s' "$$out"; else printf '%s' "$$(pwd)"; fi)
+AGENTS_FILE := $(SUPERPROJECT_ROOT)/AGENTS.md
 
 # Marker boundaries
 MARKER_OPEN := <!-- [begin] Evenlode Agentic Workflow [begin] -->
@@ -13,16 +15,10 @@ MARKER_CLOSE := <!-- [-end-] Evenlode Agentic Workflow [-end-] -->
 workflow:
 	@echo "🔄 Syncing workflow into AGENTS.md..."
 
-	@this_top=$$(git rev-parse --show-toplevel 2>/dev/null || true); \
-	super=$$(git rev-parse --show-superproject-working-tree 2>/dev/null || true); \
-	parent=$$(dirname "$$this_top"); \
+	@super=$$(git rev-parse --show-superproject-working-tree 2>/dev/null || true); \
 	if [ -z "$$super" ]; then \
-		echo "❌ This checkout is not a git submodule. Refusing to write ../AGENTS.md."; \
+		echo "❌ This checkout is not a git submodule. Refusing to write $(AGENTS_FILE)."; \
 		echo "   From the parent repository: git submodule add https://github.com/adestr/agents-makefile"; \
-		exit 1; \
-	fi; \
-	if [ "$$super" != "$$parent" ]; then \
-		echo "❌ This submodule lives in $$super, not directly in that repository's root. Refusing to write ../AGENTS.md."; \
 		exit 1; \
 	fi
 
