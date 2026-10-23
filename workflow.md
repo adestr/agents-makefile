@@ -167,7 +167,7 @@ adversarial-review:
 	- Errors: a failure is ignored, logged and then treated as success, or returned as a success value.
 	- Tests: runtime behavior changed and removing that behavior would not fail a test.
 	- Scope: the diff changes a file or behavior the accepted plan did not name.
-	- Boundaries: the page hook (`inject.js` and `window.__BLAZOR_WASM_DEVTOOLS_GLOBAL_HOOK__`), the extension UI (`ui/`), or the NuGet instrumentation (`instrumentation/`) are coupled in a way the plan did not name.
+	- Boundaries: the diff couples components across a boundary this repository records outside this workflow block, and the plan did not name that coupling. If this repository records no such boundary, this check does not apply.
 	A `note` is a naming or wording issue that no check in `clean-static-analysis` enforces. Do not edit the diff to clear a note.
 	If nothing matches, the report is `no findings`.
 	Satisfied when: the report is shown.
