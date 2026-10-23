@@ -34,7 +34,13 @@ workflow:
 		exit 1; \
 	fi
 
-	@if [ ! -f "$(AGENTS_FILE)" ]; then \
+	@ensure_trailing_newline() { \
+		file="$$1"; \
+		if [ -s "$$file" ] && [ "$$(tail -c 1 "$$file" 2>/dev/null | od -An -t x1 | tr -d ' \n')" != "0a" ]; then \
+			printf '\n' >> "$$file"; \
+		fi; \
+	}; \
+	if [ ! -f "$(AGENTS_FILE)" ]; then \
 		echo "📄 Creating AGENTS.md..."; \
 		printf '%s\n' "$(MARKER_OPEN)" "$(MARKER_CLOSE)" > $(AGENTS_FILE); \
 	fi
@@ -45,10 +51,12 @@ workflow:
 		echo "⚠️  Malformed markers detected — repairing..."; \
 		TMP=$$(mktemp); \
 		grep -F -v -x -e "$(MARKER_OPEN)" -e "$(MARKER_CLOSE)" $(AGENTS_FILE) > $$TMP || true; \
+		ensure_trailing_newline "$$TMP"; \
 		printf '%s\n' "$(MARKER_OPEN)" "$(MARKER_CLOSE)" >> $$TMP; \
 		mv $$TMP $(AGENTS_FILE); \
 	elif [ "$$OPEN_COUNT" -eq 0 ]; then \
 		echo "📄 Adding workflow markers..."; \
+		ensure_trailing_newline "$(AGENTS_FILE)"; \
 		printf '%s\n' "$(MARKER_OPEN)" "$(MARKER_CLOSE)" >> $(AGENTS_FILE); \
 	fi
 
