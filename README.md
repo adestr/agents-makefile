@@ -18,6 +18,6 @@ cd agents-makefile && make workflow
 ## Update
 
 ```bash
-git submodule update --init --recursive
+git submodule update --remote --init --recursive
 cd agents-makefile && make workflow
 ```
