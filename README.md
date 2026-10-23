@@ -15,6 +15,8 @@ git submodule add https://github.com/adestr/agents-makefile
 cd agents-makefile && make workflow
 ```
 
+After `make workflow`, document this repository's boundaries in `AGENTS.md`, outside the workflow markers. The adversarial review treats coupling across a recorded boundary as a blocker when the plan did not name it. If you record no boundary, that check does not apply.
+
 ## Update
 
 ```bash
