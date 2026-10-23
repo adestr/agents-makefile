@@ -1,5 +1,5 @@
 <!-- This workflow is automatically inserted into your AGENTS.md file, please do not edit it directly -->
-<!-- To update the workflow, run `make workflow` inside ./agent-workflow -->
+<!-- To update the workflow, run `make workflow` inside ./agents-makefile -->
 
 # Agent Workflow
 
