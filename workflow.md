@@ -264,8 +264,10 @@ human-landing-approval:
 
 land:
 	Open or update the pull request. Include `Closes #[id]` in the body, where `[id]` is the issue number the human named.
-	If this step opened the pull request, run `sleep 5` before checking for review requests, so an automatic request has time to appear.
-	Just before merge, after the pull request's checks have finished, read the pull request timeline.
+	Opening a pull request, marking a draft pull request ready for review, and pushing to its branch can each request an automatic bot review.
+	After this step opens the pull request, marks it ready for review, or pushes to it, run `sleep 5` before reading the timeline, so an automatic request has time to appear.
+	Run the command that marks the pull request ready for review on its own. Do not chain it with the merge command.
+	Just before merge, after the pull request's checks have finished, read the pull request timeline. That read must come after the last of those state changes; a read taken before one of them does not clear the merge.
 	If that timeline has a `review_requested` event for a bot and that bot has not submitted its review, wait for the review.
 	Apply `all-bots-triaged` to that pull request. Do not merge while it is unsatisfied.
 	If the timeline has no `review_requested` event, do not wait for a review to appear.
