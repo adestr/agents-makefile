@@ -75,8 +75,9 @@ baseline-tests-pass:
 	From the repository root, run every full test suite this repository already defines.
 	If `package.json` defines a `test` script, run `pnpm test`.
 	If a `*.sln` file exists, run `dotnet test`.
-	If both apply, run both.
-	If neither applies, say "no test command" and stop. Do not add a test runner, a `test` script, or a solution file.
+	If the repository root has `pytest.ini`, a `[tool.pytest.ini_options]` table in `pyproject.toml`, a `[tool:pytest]` section in `setup.cfg`, a `[pytest]` section in `tox.ini`, a `conftest.py`, or a `tests/` directory containing a `test_*.py` file, run pytest. Run `uv run pytest` when `uv.lock` exists, `poetry run pytest` when `poetry.lock` exists, and `python -m pytest` otherwise.
+	If more than one applies, run each.
+	If none applies, say "no test command" and stop. Do not add a test runner, a `test` script, a solution file, or a pytest configuration.
 	Satisfied when: every command that applied exited 0, or "no test command" is stated.
 
 main-tests-green:
