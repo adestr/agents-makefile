@@ -11,7 +11,10 @@ AGENTS_FILE := $(SUPERPROJECT_ROOT)/AGENTS.md
 MARKER_OPEN := <!-- [begin] Evenlode Agentic Workflow [begin] -->
 MARKER_CLOSE := <!-- [-end-] Evenlode Agentic Workflow [-end-] -->
 
-.PHONY: workflow
+.PHONY: workflow health
+health:
+	@./health-check.sh
+
 workflow:
 	@echo "🔄 Syncing workflow into AGENTS.md..."
 

@@ -7,13 +7,13 @@ The workflow is a Makefile-style DAG. The active target is `finish` unless the h
 
 1. Start at the active target. Choose its leftmost prerequisite that is not satisfied, and repeat until every prerequisite of the current target is satisfied. Work on that target.
 2. Run that target's recipe. When it is satisfied, write the name of the current target in inline code, then ' → ', then the name of the leftmost unsatisfied target, and continue to that leftmost unsatisfied target in the same turn.
-   - Stop only when the next target is named `human-*-approval`, or when the stage just finished makes an earlier gate unsatisfied. `triaged-blockers` and `all-bots-triaged` name that backward move.
+   - Stop only when the next target is a `human-*-approval` gate that is not already satisfied, or when the stage just finished makes an earlier gate unsatisfied. `triaged-blockers` and `all-bots-triaged` name that backward move.
    - On a human gate, ask for the approval that gate's **Satisfied when** line requires. Do not treat "Continue" as that approval.
 3. A target is satisfied only when its **Satisfied when** condition is true.
-4. A human gate is satisfied only when the human's latest message explicitly approves the artifact that gate presented. Approval of a different gate does not count. If the human asks for a change, that gate is unsatisfied and the target that produced the artifact is unsatisfied too.
+4. A human gate is satisfied only when the human's latest message explicitly approves the artifact that gate presented. Approval of a different gate does not count, except that choosing `ship` at `human-commit-approval` also satisfies `human-push-approval` and `human-landing-approval` for that commit. If the human asks for a change, that gate is unsatisfied and the target that produced the artifact is unsatisfied too.
 5. Do not add a target, skip a target, or choose a different unsatisfied prerequisite than the leftmost one.
 6. Lines under a target are instructions. A line in backticks is a command.
-7. Do not commit, push, merge, check out another branch, or delete branches except where `branch-created`, `main-tests-green`, `commit`, `push`, `land`, or `pristine-workbench` says to.
+7. Do not commit, push, merge, enable or disable auto-merge, check out another branch, or delete branches except where `branch-created`, `main-tests-green`, `stalled-prs-checked`, `commit`, `push`, `land`, or `pristine-workbench` says to.
 8. If a recipe says a scar ledger, changelog, CI workflow, or review bot is absent, record that and finish the step. Do not create that system in order to satisfy the step.
 
 Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adversarial-review`, and `clean-static-analysis`.
@@ -28,14 +28,15 @@ Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adve
 	clean-static-analysis doc-audit-complete human-review-approval \
 	triaged-blockers adversarial-review human-diff-approval \
 	implementation-diff tdd-failing-repro baseline-tests-pass approved-plan human-plan-approval \
-	researched-ticket branch-created candidate-scars git-archaeology main-tests-green ticket-assigned
+	researched-ticket branch-created candidate-scars git-archaeology main-tests-green ticket-assigned \
+	stalled-prs-checked repo-health-checked
 
 finish: pristine-workbench
 pristine-workbench: codified-scars-consolidated
 codified-scars-consolidated: land
 land: human-landing-approval
 human-landing-approval: ready-to-land
-ready-to-land: ci-quiescent changelog-updated
+ready-to-land: ci-quiescent
 ci-quiescent: ci-remote-green all-bots-triaged
 ci-remote-green: push
 all-bots-triaged: push
@@ -44,7 +45,7 @@ human-push-approval: commit
 commit: human-commit-approval
 human-commit-approval: pre-commit-tests-pass
 pre-commit-tests-pass: pre-commit-clean
-pre-commit-clean: approved-adversarial-report clean-static-analysis doc-audit-complete
+pre-commit-clean: approved-adversarial-report clean-static-analysis doc-audit-complete changelog-updated
 approved-adversarial-report: human-review-approval
 human-review-approval: triaged-blockers
 triaged-blockers: adversarial-review
@@ -61,8 +62,10 @@ git-archaeology: branch-created
 clean-static-analysis: human-diff-approval
 doc-audit-complete: human-diff-approval
 changelog-updated: human-diff-approval
-ticket-assigned: main-tests-green
+ticket-assigned: main-tests-green stalled-prs-checked repo-health-checked
 main-tests-green:
+stalled-prs-checked:
+repo-health-checked:
 ```
 
 ## Workflow Steps
@@ -92,9 +95,25 @@ main-tests-green:
 	This target checks remote `main`. It does not check an existing feature branch.
 	Satisfied when: `state` is `success`, or every local command that applied exited 0, or "no test command" is stated, or the regression issue is the ticket and the human has been told that.
 
+stalled-prs-checked:
+	If `main-tests-green` named a regression issue, say "regression is the ticket" and stop.
+	List open pull requests into `main` that have auto-merge enabled, with `gh pr list --author @me --base main --state open --json number,title,headRefName,autoMergeRequest,mergeable,statusCheckRollup,reviewDecision`. Ignore entries whose `autoMergeRequest` is null.
+	A listed pull request is stalled when a check has concluded `FAILURE`, `ERROR`, `CANCELLED`, or `TIMED_OUT`, when `mergeable` is `CONFLICTING`, or when its timeline (`gh api repos/{owner}/{repo}/issues/<number>/timeline`) shows a bot review submitted after the last `auto_merge_enabled` event.
+	Name each listed pull request whose only wait is `reviewDecision` `REVIEW_REQUIRED`, so the human can approve it. Those are not stalled.
+	If any pull request is stalled, the oldest one is the ticket. Run `gh pr merge <number> --disable-auto` on its own, so no fix merges before it is approved. Tell the human that this pull request is the ticket for this run, in place of the request that started the run.
+	Satisfied when: "regression is the ticket" is stated, or "no stalled pull requests" is stated, or the stalled pull request has auto-merge disabled, is the ticket, and the human has been told that.
+
+repo-health-checked:
+	From the repository root, run `./agents-makefile/health-check.sh`, or `./agents-makefile/health-check.ps1` on Windows. Use the path of this repository's agents-makefile submodule if it lives elsewhere.
+	Show each `FAIL` and `WARN` line to the human. Do not change repository settings, rulesets, or CI to clear them.
+	The last line, `auto-merge: eligible` or `auto-merge: not eligible`, decides whether `human-commit-approval` may offer `ship`.
+	If the script is missing or exits 2, say "health check unavailable". `ship` is then not offered.
+	Satisfied when: the script's findings and last line are shown, or "health check unavailable" is stated.
+
 ticket-assigned:
 	Restate the requested outcome in one sentence, including what will be different when the work is done.
 	If `main-tests-green` named a regression issue, that issue is the ticket.
+	If `stalled-prs-checked` named a pull request, that pull request is the ticket.
 	Otherwise the human's message is the ticket when it names that outcome. Do not invent a tracker id.
 	Satisfied when: that sentence is stated and it matches the ticket.
 
@@ -102,6 +121,7 @@ branch-created:
 	Name the working branch `[prefix]/[issue number]-[terse kebab-case issue summary]`.
 	Use the prefix `fix` when the issue is labelled `bug` or `regression`, and `feat` otherwise.
 	Take the issue number, title, and labels from the issue the human named. The issue named by `main-tests-green` counts as that issue. Do not invent an issue number.
+	If the ticket is a pull request named by `stalled-prs-checked`, its head branch is the working branch.
 	If the current branch already has that name, stop.
 	If that branch exists, check it out.
 	Otherwise check out `main`, run `git pull`, and create the branch from `main`.
@@ -203,8 +223,8 @@ doc-audit-complete:
 
 pre-commit-clean:
 	Run `git status` and `git diff`.
-	Confirm the tree contains only the approved diff, the test from `tdd-failing-repro`, doc fixes from `doc-audit-complete`, and blocker fixes.
-	Satisfied when: that is all `git status` shows, and `clean-static-analysis` and `doc-audit-complete` are satisfied.
+	Confirm the tree contains only the approved diff, the test from `tdd-failing-repro`, doc fixes from `doc-audit-complete`, the entry from `changelog-updated`, and blocker fixes.
+	Satisfied when: that is all `git status` shows, and `clean-static-analysis`, `doc-audit-complete`, and `changelog-updated` are satisfied.
 
 pre-commit-tests-pass:
 	Run the same commands as `baseline-tests-pass`.
@@ -213,9 +233,11 @@ pre-commit-tests-pass:
 	Satisfied when: every command that applied exited 0, or "no test command" is stated.
 
 human-commit-approval:
-	Show `git status` and the proposed commit message. The message states why the change was made.
-	Stop and ask the human for permission to create the commit.
-	Satisfied when: the human's latest message explicitly tells you to create the commit.
+	Show `git status` and the proposed commit message. The message states why the change was made and includes any user-visible changes listed by `changelog-updated`.
+	If `repo-health-checked` ended with `auto-merge: eligible`, offer two choices. `commit` stops again at `human-push-approval` and `human-landing-approval`. `ship` commits, pushes, opens the pull request, and enables auto-merge once `all-bots-triaged` is satisfied; GitHub then merges when the required checks pass.
+	Otherwise ask only for permission to create the commit.
+	Stop and wait for the human.
+	Satisfied when: the human's latest message explicitly tells you to create the commit or explicitly chooses `ship`. Record which.
 
 commit:
 	Stage only the files that belong in the approved diff and create the commit with the approved message.
@@ -223,8 +245,9 @@ commit:
 
 human-push-approval:
 	State the remote and branch you will push.
-	Stop and ask the human for permission to push.
-	Satisfied when: the human's latest message explicitly tells you to push.
+	If the human chose `ship` for this commit, continue without stopping.
+	Otherwise stop and ask the human for permission to push.
+	Satisfied when: the human's latest message explicitly tells you to push, or the human chose `ship` for this commit.
 
 push:
 	Run `git push -u origin HEAD`.
@@ -233,7 +256,8 @@ push:
 ci-remote-green:
 	If the remote has required checks for the branch, wait until each required check has succeeded.
 	If `.github/workflows/` has no workflow files, or the branch has no checks, say "no remote CI checks".
-	Satisfied when: every required check has succeeded, or "no remote CI checks" is stated.
+	If the human chose `ship` for this commit, do not wait. Say "required checks enforced by auto-merge".
+	Satisfied when: every required check has succeeded, or "no remote CI checks" is stated, or "required checks enforced by auto-merge" is stated.
 
 all-bots-triaged:
 	A bot review has been requested when the pull request timeline contains a `review_requested` event for that bot. An empty `reviewRequests` list does not clear that request. `copilot_work_started` means that review is still outstanding.
@@ -248,19 +272,20 @@ ci-quiescent:
 
 changelog-updated:
 	If a changelog file exists, add an entry for each user-visible change in the approved diff.
-	If no changelog file exists, put those user-visible changes in the commit message from `commit`. Do not create a changelog file.
+	If no changelog file exists, list those user-visible changes for the commit message proposed at `human-commit-approval`. Do not create a changelog file.
 	If the diff has no user-visible change, say "no user-visible change".
-	Satisfied when: the entry exists, the commit message already states the user-visible change, or "no user-visible change" is stated.
+	Satisfied when: the entry exists, the user-visible changes are listed, or "no user-visible change" is stated.
 
 ready-to-land:
-	State how you will land: the pull request to open or update, and the base branch `main`.
+	State how you will land: the pull request to open or update, and the base branch `main`. If the human chose `ship`, also state that auto-merge will be enabled with squash.
 	Do not open or merge it in this step.
-	Satisfied when: `ci-quiescent` and `changelog-updated` are satisfied and that landing statement is shown.
+	Satisfied when: `ci-quiescent` is satisfied and that landing statement is shown.
 
 human-landing-approval:
 	Present the landing statement from `ready-to-land`.
-	Stop and ask the human to approve landing onto `main`.
-	Satisfied when: the human's latest message explicitly approves landing onto `main`.
+	If the human chose `ship` for this commit, continue without stopping.
+	Otherwise stop and ask the human to approve landing onto `main`.
+	Satisfied when: the human's latest message explicitly approves landing onto `main`, or the human chose `ship` for this commit.
 
 land:
 	Open or update the pull request. Include `Closes #[id]` in the body, where `[id]` is the issue number the human named.
@@ -272,7 +297,8 @@ land:
 	Apply `all-bots-triaged` to that pull request. Do not merge while it is unsatisfied.
 	If the timeline has no `review_requested` event, do not wait for a review to appear.
 	Then merge the pull request into `main` using the path the human approved.
-	Satisfied when: the commit from `commit` is contained in `main`, or the pull request into `main` has been merged by squash or rebase, and every bot review requested on the timeline before the merge was submitted and its comments were fixed or deferred.
+	If the human chose `ship`, do not wait for checks and do not merge. Once `all-bots-triaged` is satisfied for the pull request, run `gh pr merge --auto --squash` on its own. A fix during that triage makes `human-diff-approval` unsatisfied, and the next commit needs its own `ship`.
+	Satisfied when: the commit from `commit` is contained in `main`, or the pull request into `main` has been merged by squash or rebase, or, under `ship`, `gh pr view --json autoMergeRequest` shows auto-merge enabled; and every bot review requested on the timeline before the merge or before auto-merge was enabled was submitted and its comments were fixed or deferred.
 
 codified-scars-consolidated:
 	This step records a new failure mode from the work just finished. It does not introduce a scar practice into a repository that has none.
