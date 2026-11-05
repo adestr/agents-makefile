@@ -91,13 +91,14 @@ main-tests-green:
 	Resolve the tip SHA of remote `main` with `gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" /repos/{owner}/{repo}/commits/main --jq .sha`.
 	`{owner}` and `{repo}` are the repository of the current directory.
 	List the pull requests that introduced that commit with `gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" /repos/{owner}/{repo}/commits/{sha}/pulls`.
-	If that list contains a pull request whose base is `main`, read its checks with `gh pr view <number> --json statusCheckRollup`.
+	From that list, select the pull request whose base is `main` and whose `merge_commit_sha` equals `{sha}`.
+	If there is such a pull request, read its checks with `gh pr view <number> --json statusCheckRollup`.
 	`state` is `success` when `statusCheckRollup` is non-empty and every entry has concluded `SUCCESS`, `NEUTRAL`, or `SKIPPED`, or (for a StatusContext) reports `SUCCESS`.
-	`state` is `failure` when any entry has concluded `FAILURE`, `CANCELLED`, `TIMED_OUT`, or `ACTION_REQUIRED`, or (for a StatusContext) reports `error` or `failure`.
-	`state` is `pending` when there is no such pull request, when `statusCheckRollup` is empty or null, or when any entry has not concluded.
+	`state` is `failure` when any entry has concluded `FAILURE`, `CANCELLED`, `TIMED_OUT`, `ACTION_REQUIRED`, or `STARTUP_FAILURE`, or (for a StatusContext) reports `ERROR` or `FAILURE`.
+	`state` is `pending` when there is no such pull request, when `statusCheckRollup` is empty or null, when any entry has not concluded, or (for a StatusContext) reports `PENDING` or `EXPECTED`.
 	If `state` is `success`, this target is satisfied.
 	If `state` is `failure`, those checks are a regression.
-	If `state` is `pending`, or any of those commands exits non-zero, run the commands in `baseline-tests-pass` from the repository root.
+	If `state` is `pending`, or any of those commands exit non-zero, run the commands in `baseline-tests-pass` from the repository root.
 	When the worktree has no uncommitted changes, check out `main` and run `git pull` before that local run.
 	If those commands do not apply, say "no test command".
 	If a local command fails, those failures are a regression.
