@@ -94,8 +94,8 @@ main-tests-green:
 	From that list, select the pull request whose base is `main` and whose `merge_commit_sha` equals `{sha}`.
 	If there is such a pull request, read its checks with `gh pr view <number> --json statusCheckRollup`.
 	`state` is `success` when `statusCheckRollup` is non-empty and every entry has concluded `SUCCESS`, `NEUTRAL`, or `SKIPPED`, or (for a StatusContext) reports `SUCCESS`.
-	`state` is `failure` when any entry has concluded `FAILURE`, `ERROR`, `CANCELLED`, `TIMED_OUT`, or `ACTION_REQUIRED`, or (for a StatusContext) reports `ERROR` or `FAILURE`.
-	`state` is `pending` when there is no such pull request, when `statusCheckRollup` is empty or null, or when any entry has not concluded.
+	`state` is `failure` when any entry has concluded `FAILURE`, `CANCELLED`, `TIMED_OUT`, `ACTION_REQUIRED`, or `STARTUP_FAILURE`, or (for a StatusContext) reports `ERROR` or `FAILURE`.
+	`state` is `pending` when there is no such pull request, when `statusCheckRollup` is empty or null, when any entry has not concluded, or (for a StatusContext) reports `PENDING` or `EXPECTED`.
 	If `state` is `success`, this target is satisfied.
 	If `state` is `failure`, those checks are a regression.
 	If `state` is `pending`, or any of those commands exit non-zero, run the commands in `baseline-tests-pass` from the repository root.
