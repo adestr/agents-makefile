@@ -42,7 +42,7 @@ $rules = @($rules)
 $statusRules = @($rules | Where-Object type -eq 'required_status_checks')
 $prRules = @($rules | Where-Object type -eq 'pull_request')
 
-$rsChecks = @($statusRules | ForEach-Object { $_.parameters.required_status_checks } | Where-Object { $_ }).Count
+$rsChecks = @($statusRules | ForEach-Object { $_.parameters.required_status_checks } | Where-Object { $null -ne $_ }).Count
 $rsStrict = @($statusRules | Where-Object { $_.parameters.strict_required_status_checks_policy }).Count -gt 0
 $mergeQueue = @($rules | Where-Object type -eq 'merge_queue').Count -gt 0
 $copilot = @($rules | Where-Object type -eq 'copilot_code_review').Count -gt 0
