@@ -10,10 +10,10 @@ The workflow is a Makefile-style DAG. The active target is `finish` unless the h
    - Stop only when the next target is a `human-*-approval` gate that is not already satisfied, or when the stage just finished makes an earlier gate unsatisfied. `triaged-blockers` and `all-bots-triaged` name that backward move.
    - On a human gate, ask for the approval that gate's **Satisfied when** line requires. Do not treat "Continue" as that approval.
 3. A target is satisfied only when its **Satisfied when** condition is true.
-4. A human gate is satisfied only when the human's latest message explicitly approves the artifact that gate presented. Approval of a different gate does not count, except that choosing `ship` at `human-commit-approval` also satisfies `human-push-approval` and `human-landing-approval` for that commit. If the human asks for a change, that gate is unsatisfied and the target that produced the artifact is unsatisfied too. If the human chooses to stop work at `human-criteria-approval`, the run ends there; do not continue to any later target.
+4. A human gate is satisfied only when the human's latest message explicitly approves the artifact that gate presented. Approval of a different gate does not count, except that choosing `ship` at `human-commit-approval` also satisfies `human-push-approval` and `human-landing-approval` for that commit. If the human asks for a change, that gate is unsatisfied and the target that produced the artifact is unsatisfied too. If the human chooses to stop work at `human-assignee-approval` or `human-criteria-approval`, the run ends there; do not continue to any later target.
 5. Do not add a target, skip a target, or choose a different unsatisfied prerequisite than the leftmost one.
 6. Lines under a target are instructions. A line in backticks is a command.
-7. Do not commit, push, merge, enable or disable auto-merge, check out another branch, or delete branches except where `branch-created`, `main-tests-green`, `stalled-prs-checked`, `commit`, `push`, `land`, or `pristine-workbench` says to.
+7. Do not commit, push, merge, enable or disable auto-merge, change an issue's assignees, check out another branch, or delete branches except where `branch-created`, `main-tests-green`, `stalled-prs-checked`, `ticket-claimed`, `commit`, `push`, `land`, or `pristine-workbench` says to.
 8. If a recipe says a scar ledger, changelog, CI workflow, or review bot is absent, record that and finish the step. Do not create that system in order to satisfy the step.
 
 Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adversarial-review`, and `clean-static-analysis`.
@@ -29,7 +29,8 @@ Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adve
 	triaged-blockers adversarial-review human-diff-approval \
 	implementation-diff tdd-failing-repro baseline-tests-pass approved-plan human-plan-approval \
 	researched-ticket branch-created candidate-scars git-archaeology human-criteria-approval \
-	acceptance-criteria-checked main-tests-green ticket-assigned stalled-prs-checked repo-health-checked
+	acceptance-criteria-checked ticket-claimed human-assignee-approval assignee-checked \
+	main-tests-green ticket-assigned stalled-prs-checked repo-health-checked
 
 finish: pristine-workbench
 pristine-workbench: codified-scars-consolidated
@@ -58,7 +59,10 @@ human-plan-approval: researched-ticket
 researched-ticket: branch-created candidate-scars git-archaeology
 branch-created: human-criteria-approval
 human-criteria-approval: acceptance-criteria-checked
-acceptance-criteria-checked: ticket-assigned
+acceptance-criteria-checked: ticket-claimed
+ticket-claimed: human-assignee-approval
+human-assignee-approval: assignee-checked
+assignee-checked: ticket-assigned
 candidate-scars: branch-created
 git-archaeology: branch-created
 clean-static-analysis: human-diff-approval
@@ -119,6 +123,26 @@ ticket-assigned:
 	If `stalled-prs-checked` named a pull request, that pull request is the ticket.
 	Otherwise the human's message is the ticket when it names that outcome. Do not invent a tracker id.
 	Satisfied when: that sentence is stated and it matches the ticket.
+
+assignee-checked:
+	The ticket issue is the issue number the human named, the regression issue from `main-tests-green`, or, for a stalled pull request from `stalled-prs-checked`, the issue it closes (`gh pr view <number> --json closingIssuesReferences`).
+	If there is no ticket issue, say "no issue to assign" and stop.
+	Read the current `gh` login with `gh api user --jq .login`, and the issue's assignees with `gh issue view <issue> --json assignees`.
+	Report the assignees as one of: "unassigned", "assigned to current user", or "assigned to <logins>" when any assignee is a different user.
+	When the issue is assigned to a different user, look for recent signs that work has begun: a branch listed by `gh issue develop --list <issue>`, or an event in `gh api repos/{owner}/{repo}/issues/<issue>/timeline` from the past 7 days whose `event` is `connected`, `cross-referenced`, `referenced`, or `assigned`. Quote each one found with its date, or say "no recent activity".
+	Satisfied when: "no issue to assign" is stated, or the current login and one of those assignee reports are stated, and for "assigned to <logins>" the recent activity is quoted or "no recent activity" is stated.
+
+human-assignee-approval:
+	If `assignee-checked` stated "no issue to assign", "unassigned", or "assigned to current user", continue without stopping.
+	Otherwise stop. Tell the human who the issue is assigned to and the recent activity from `assignee-checked`, and ask them to choose: stop work on this ticket and pick another, or reassign the issue to the current `gh` login.
+	Do not work on an issue assigned to a different user before this gate is satisfied.
+	Satisfied when: `assignee-checked` stated "no issue to assign", "unassigned", or "assigned to current user", or the human's latest message explicitly chooses to reassign the issue. If the human chooses to stop, the run ends.
+
+ticket-claimed:
+	If `assignee-checked` stated "no issue to assign" or "assigned to current user", do nothing.
+	If it stated "unassigned", run `gh issue edit <issue> --add-assignee @me`.
+	If the human chose to reassign, run `gh issue edit <issue> --remove-assignee <logins> --add-assignee @me`, where `<logins>` are the other assignees joined by commas.
+	Satisfied when: "no issue to assign" was stated, or `gh issue view <issue> --json assignees` lists only the current `gh` login.
 
 acceptance-criteria-checked:
 	Quote each acceptance criterion the ticket states, one per line.
