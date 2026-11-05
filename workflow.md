@@ -13,7 +13,7 @@ The workflow is a Makefile-style DAG. The active target is `finish` unless the h
 4. A human gate is satisfied only when the human's latest message explicitly approves the artifact that gate presented. Approval of a different gate does not count, except that choosing `ship` at `human-commit-approval` also satisfies `human-push-approval` and `human-landing-approval` for that commit. If the human asks for a change, that gate is unsatisfied and the target that produced the artifact is unsatisfied too. If the human chooses to stop work at `human-assignee-approval` or `human-criteria-approval`, the run ends there; do not continue to any later target.
 5. Do not add a target, skip a target, or choose a different unsatisfied prerequisite than the leftmost one.
 6. Lines under a target are instructions. A line in backticks is a command.
-7. Do not commit, push, merge, enable or disable auto-merge, change an issue's assignees, check out another branch, or delete branches except where `branch-created`, `main-tests-green`, `stalled-prs-checked`, `ticket-claimed`, `commit`, `push`, `land`, `scars-saved`, or `pristine-workbench` says to.
+7. Do not commit, push, merge, enable or disable auto-merge, change an issue's assignees or body, check out another branch, or delete branches except where `branch-created`, `main-tests-green`, `stalled-prs-checked`, `ticket-claimed`, `acceptance-criteria-recorded`, `commit`, `push`, `land`, `scars-saved`, or `pristine-workbench` says to.
 8. If a recipe says a scar ledger, changelog, CI workflow, or review bot is absent, record that and finish the step. Do not create that system in order to satisfy the step.
 
 Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adversarial-review`, and `clean-static-analysis`.
@@ -28,9 +28,9 @@ Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adve
 	clean-static-analysis doc-audit-complete human-review-approval \
 	triaged-blockers adversarial-review human-diff-approval \
 	implementation-diff tdd-failing-repro baseline-tests-pass approved-plan human-plan-approval \
-	researched-ticket branch-created candidate-scars git-archaeology human-criteria-approval \
-	acceptance-criteria-checked ticket-claimed human-assignee-approval assignee-checked \
-	main-tests-green ticket-assigned stalled-prs-checked repo-health-checked
+	researched-ticket branch-created candidate-scars git-archaeology acceptance-criteria-recorded \
+	human-criteria-approval acceptance-criteria-checked ticket-claimed human-assignee-approval \
+	assignee-checked main-tests-green ticket-assigned stalled-prs-checked repo-health-checked
 
 finish: pristine-workbench
 pristine-workbench: scars-saved
@@ -58,7 +58,8 @@ tdd-failing-repro: approved-plan
 approved-plan: human-plan-approval
 human-plan-approval: researched-ticket
 researched-ticket: branch-created candidate-scars git-archaeology
-branch-created: human-criteria-approval
+branch-created: acceptance-criteria-recorded
+acceptance-criteria-recorded: human-criteria-approval
 human-criteria-approval: acceptance-criteria-checked
 acceptance-criteria-checked: ticket-claimed
 ticket-claimed: human-assignee-approval
@@ -170,6 +171,15 @@ human-criteria-approval:
 	Do not create a branch or edit the tree before this gate is satisfied.
 	Satisfied when: no criterion was `too broad` and the ticket was not missing criteria for a runtime behavior change, or the human's latest message explicitly accepts the presented list, which becomes the accepted criteria. If the human chooses to stop, the run ends.
 
+acceptance-criteria-recorded:
+	If `assignee-checked` stated "no issue to assign", say "no issue to update" and stop.
+	If the accepted criteria are empty, or every stated criterion was already `testable`, say "criteria unchanged" and stop.
+	Otherwise the accepted criteria differ from what the ticket stated. Read the issue body with `gh issue view <issue> --json body --jq .body`.
+	Build a new body that keeps every part of the current body outside an `## Acceptance criteria` section, and sets that section to one `- ` bullet per accepted criterion. If the current body has no such section, append it after the existing body, separated by a blank line.
+	Write the body with `gh issue edit <issue> --body <body>`.
+	Do not create a branch or edit the tree in this step.
+	Satisfied when: "no issue to update" or "criteria unchanged" is stated, or `gh issue view <issue> --json body --jq .body` shows an `## Acceptance criteria` section whose bullets are exactly the accepted criteria.
+
 branch-created:
 	Name the working branch `[prefix]/[issue number]-[terse kebab-case issue summary]`.
 	Use the prefix `fix` when the issue is labelled `bug` or `regression`, and `feat` otherwise.
@@ -205,6 +215,7 @@ approved-plan:
 	Restate the plan the human accepted. Do not widen it.
 	Satisfied when: the restated plan is the accepted one.
 	If the plan must change, `human-plan-approval` is unsatisfied until the human accepts the revised plan.
+	Later gates do not rewrite acceptance criteria on their own. If the accepted criteria must change, `human-criteria-approval` is unsatisfied until the human accepts the revised list; `acceptance-criteria-recorded` then runs again.
 
 tdd-failing-repro:
 	If the accepted plan changes no runtime behavior, add no test. Say "no runtime behavior; no test added".
