@@ -178,10 +178,10 @@ branch-created:
 	Satisfied when: `git branch --show-current` prints that name.
 
 candidate-scars:
-	Search the repository for a scar ledger: a file that records entries in the form WOUND, TRAP, REFLEX.
-	If a ledger exists, quote each entry whose subject is the area named by the ticket.
-	If no ledger exists, say "no scar ledger" and stop. Do not create one.
-	Satisfied when: the quoted entries are listed, or "no scar ledger" is stated.
+	The scar ledger records entries in the form WOUND, TRAP, REFLEX. Its path is the one `AGENTS.md` names for the scar ledger outside this workflow block, or `SCARS.md` at the repository root when none is named.
+	If that file exists, state its path and quote each entry whose subject is the area named by the ticket.
+	If it does not exist, say "no scar ledger" and stop. Do not create one.
+	Satisfied when: the ledger path and the quoted entries are listed, or "no scar ledger" is stated.
 
 git-archaeology:
 	From the repository root, run `git log -20 --oneline -- <paths>` for the paths the ticket will change.
@@ -364,14 +364,16 @@ codified-scars-consolidated:
 	Satisfied when: "no new scar" is stated, or the WOUND, TRAP, and REFLEX lines are written to the existing ledger or to the turn.
 
 scars-saved:
-	The ledger is the file `candidate-scars` found. The working branch is the one from `branch-created`.
-	If no scar ledger exists, say "no scar ledger" and stop.
+	`<ledger>` is the path `candidate-scars` stated. The working branch is the one from `branch-created`.
+	If `candidate-scars` stated "no scar ledger", say "no scar ledger" and stop.
 	If `git status --porcelain -- <ledger>` prints nothing, say "no scar edits" and stop.
-	If `git ls-files --error-unmatch <ledger>` exits non-zero, say "scar ledger not in git" and stop. Do not add it to git.
-	The scar commit contains only the ledger, with the message "Record scars from <working branch>".
+	If `git ls-files --error-unmatch -- <ledger>` exits non-zero, say "scar ledger not in git" and stop. Do not add it to git.
+	Where a line below says to create the scar commit, run `git commit -m "Record scars from <working branch>" -- <ledger>`, so the commit contains only the ledger.
 	Read the issue pull request with `gh pr view <working branch> --json state,headRefOid`.
 	If its `state` is `OPEN`, check out the working branch, create the scar commit, and run `git push`. Read the pull request again. If `headRefOid` is the scar commit, the scars are in the issue pull request; stop.
-	Otherwise the issue work merged without the scars. Run `git checkout main` and `git pull`, then create and check out the branch `<working branch>-scars` from `main`. Run `git cherry-pick <scar commit>` if the scar commit exists; otherwise create it on this branch.
+	Otherwise the issue work merged without the scars. If the scar commit does not exist yet, run `git stash push -- <ledger>`. Run `git checkout main` and `git pull`, then create and check out the branch `<working branch>-scars` from `main`.
+	If the scar commit exists, run `git cherry-pick <scar commit>`; the cherry-picked commit is now the scar commit. Otherwise run `git stash pop` and create the scar commit on this branch.
+	If the cherry-pick or `git stash pop` conflicts, stop and tell the human. Do not resolve the conflict or drop the stash.
 	Run `git push -u origin HEAD`, then open a pull request into `main` with `gh pr create`. Put `Refs #[id]` in the body, where `[id]` is the issue number the human named; omit that line when there is none. Do not merge it or enable auto-merge on it.
 	Tell the human the URL of that pull request.
 	Satisfied when: "no scar ledger", "no scar edits", or "scar ledger not in git" is stated, or `git status --porcelain -- <ledger>` prints nothing and the scar commit is the head of the issue pull request or of an open pull request from `<working branch>-scars`.
