@@ -123,7 +123,7 @@ ticket-assigned:
 acceptance-criteria-checked:
 	Quote each acceptance criterion the ticket states, one per line. A regression issue from `main-tests-green` has one criterion per failing status context or command: it passes. A stalled pull request from `stalled-prs-checked` has the criteria of the issue it closes, plus: every check that stalled it passes.
 	Mark each criterion `testable` or `too broad`. A criterion is `too broad` when any of these is true:
-	- It joins two or more requirements with a conjunction such as "and", "or", "as well as", or a list, so one test could pass while another part fails.
+	- It joins requirements that could each pass or fail on their own, using a conjunction such as "and", "or", "as well as", or a list.
 	- It uses a vague term, such as "fast", "robust", "easy", "appropriate", "properly", "better", or "user-friendly", with no measurable threshold.
 	- No automated or scripted check could be written whose pass or fail decides it.
 	For each `too broad` criterion, give the reason and propose a rewrite as one or more `testable` criteria.
