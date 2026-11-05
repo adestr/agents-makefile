@@ -13,7 +13,7 @@ The workflow is a Makefile-style DAG. The active target is `finish` unless the h
 4. A human gate is satisfied only when the human's latest message explicitly approves the artifact that gate presented. Approval of a different gate does not count, except that choosing `ship` at `human-commit-approval` also satisfies `human-push-approval` and `human-landing-approval` for that commit. If the human asks for a change, that gate is unsatisfied and the target that produced the artifact is unsatisfied too. If the human chooses to stop work at `human-assignee-approval` or `human-criteria-approval`, the run ends there; do not continue to any later target.
 5. Do not add a target, skip a target, or choose a different unsatisfied prerequisite than the leftmost one.
 6. Lines under a target are instructions. A line in backticks is a command.
-7. Do not commit, push, merge, enable or disable auto-merge, change an issue's assignees, check out another branch, or delete branches except where `branch-created`, `main-tests-green`, `stalled-prs-checked`, `ticket-claimed`, `commit`, `push`, `land`, or `pristine-workbench` says to.
+7. Do not commit, push, merge, enable or disable auto-merge, change an issue's assignees, check out another branch, or delete branches except where `branch-created`, `main-tests-green`, `stalled-prs-checked`, `ticket-claimed`, `commit`, `push`, `land`, `scars-saved`, or `pristine-workbench` says to.
 8. If a recipe says a scar ledger, changelog, CI workflow, or review bot is absent, record that and finish the step. Do not create that system in order to satisfy the step.
 
 Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adversarial-review`, and `clean-static-analysis`.
@@ -21,7 +21,7 @@ Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adve
 ## Workflow
 
 ```makefile
-.PHONY: finish pristine-workbench codified-scars-consolidated land \
+.PHONY: finish pristine-workbench scars-saved codified-scars-consolidated land \
 	human-landing-approval ready-to-land ci-quiescent changelog-updated \
 	ci-remote-green all-bots-triaged push human-push-approval commit \
 	human-commit-approval pre-commit-tests-pass pre-commit-clean approved-adversarial-report \
@@ -33,7 +33,8 @@ Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adve
 	main-tests-green ticket-assigned stalled-prs-checked repo-health-checked
 
 finish: pristine-workbench
-pristine-workbench: codified-scars-consolidated
+pristine-workbench: scars-saved
+scars-saved: codified-scars-consolidated
 codified-scars-consolidated: land
 land: human-landing-approval
 human-landing-approval: ready-to-land
@@ -361,6 +362,19 @@ codified-scars-consolidated:
 	- REFLEX: the check that prevents repeating it
 	If you hit one and no scar ledger exists, write those three lines in the turn only. Do not add a ledger file.
 	Satisfied when: "no new scar" is stated, or the WOUND, TRAP, and REFLEX lines are written to the existing ledger or to the turn.
+
+scars-saved:
+	The ledger is the file `candidate-scars` found. The working branch is the one from `branch-created`.
+	If no scar ledger exists, say "no scar ledger" and stop.
+	If `git status --porcelain -- <ledger>` prints nothing, say "no scar edits" and stop.
+	If `git ls-files --error-unmatch <ledger>` exits non-zero, say "scar ledger not in git" and stop. Do not add it to git.
+	The scar commit contains only the ledger, with the message "Record scars from <working branch>".
+	Read the issue pull request with `gh pr view <working branch> --json state,headRefOid`.
+	If its `state` is `OPEN`, check out the working branch, create the scar commit, and run `git push`. Read the pull request again. If `headRefOid` is the scar commit, the scars are in the issue pull request; stop.
+	Otherwise the issue work merged without the scars. Run `git checkout main` and `git pull`, then create and check out the branch `<working branch>-scars` from `main`. Run `git cherry-pick <scar commit>` if the scar commit exists; otherwise create it on this branch.
+	Run `git push -u origin HEAD`, then open a pull request into `main` with `gh pr create`. Put `Refs #[id]` in the body, where `[id]` is the issue number the human named; omit that line when there is none. Do not merge it or enable auto-merge on it.
+	Tell the human the URL of that pull request.
+	Satisfied when: "no scar ledger", "no scar edits", or "scar ledger not in git" is stated, or `git status --porcelain -- <ledger>` prints nothing and the scar commit is the head of the issue pull request or of an open pull request from `<working branch>-scars`.
 
 pristine-workbench:
 	Run `git checkout main` and `git pull`.
