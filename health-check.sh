@@ -78,7 +78,7 @@ else
 fi
 
 if [ ! -f AGENTS.md ] || ! grep -Fqx "$MARKER_OPEN" AGENTS.md; then
-	warn "AGENTS.md has no workflow block; run ./.agents-makefile/sync.sh"
+	warn "AGENTS.md has no workflow block; run ./.agents-makefile/sync.sh (or: curl -fsSL https://raw.githubusercontent.com/adestr/agents-makefile/main/sync.sh | bash)"
 elif ! awk -v open="$MARKER_OPEN" -v close="$MARKER_CLOSE" '
 		$0 == open { inblock = 1; next }
 		$0 == close { inblock = 0; next }

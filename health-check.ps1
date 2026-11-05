@@ -85,7 +85,7 @@ else { Warn 'no .github/workflows; required checks must come from another CI' }
 
 $agents = if (Test-Path AGENTS.md) { @(Get-Content AGENTS.md) } else { @() }
 if ($agents -notcontains $MarkerOpen) {
-	Warn 'AGENTS.md has no workflow block; run ./.agents-makefile/sync.sh'
+	Warn 'AGENTS.md has no workflow block; run ./.agents-makefile/sync.sh (or: curl -fsSL https://raw.githubusercontent.com/adestr/agents-makefile/main/sync.sh | bash)'
 }
 else {
 	$inBlock = $false

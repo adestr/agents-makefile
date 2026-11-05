@@ -79,7 +79,8 @@ fetch_to() {
 		cp "$LOCAL_SOURCE/$rel" "$dest"
 		return 0
 	fi
-	if curl -fsSL "$RAW_BASE/$rel" -o "$dest" 2>/dev/null; then
+	if command -v curl >/dev/null 2>&1 \
+		&& curl -fsSL "$RAW_BASE/$rel" -o "$dest" 2>/dev/null; then
 		return 0
 	fi
 	# Offline / unpublished-ref fallback: reuse a previously vendored copy.
@@ -87,6 +88,9 @@ fetch_to() {
 		info "⚠️  Could not download $rel; reusing $VENDOR_DIR/$rel"
 		cp "$TARGET_ROOT/$VENDOR_DIR/$rel" "$dest"
 		return 0
+	fi
+	if ! command -v curl >/dev/null 2>&1; then
+		die "curl is required to fetch $rel (no local or vendored copy available)"
 	fi
 	die "failed to download $RAW_BASE/$rel"
 }
@@ -161,7 +165,9 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 if [[ -n "${1:-}" ]]; then
-	TARGET_ROOT=$(cd "$1" && pwd) || die "cannot enter target path: $1"
+	# Resolve the enclosing git root so a subdirectory path still syncs the repo.
+	TARGET_ROOT=$(cd "$1" && git rev-parse --show-toplevel 2>/dev/null) \
+		|| die "target path is not inside a git repository: $1"
 elif TARGET_ROOT=$(resolve_vendored_target); then
 	:
 else
@@ -173,7 +179,6 @@ if is_canonical_layout "$TARGET_ROOT"; then
 	die "refusing to sync into the agents-makefile source repo itself; pass a target path (./sync.sh /path/to/repo)"
 fi
 
-command -v curl >/dev/null 2>&1 || die "curl is required"
 command -v awk >/dev/null 2>&1 || die "awk is required"
 
 info "🔄 Syncing workflow into $TARGET_ROOT ..."
