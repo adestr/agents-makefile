@@ -121,7 +121,9 @@ ticket-assigned:
 	Satisfied when: that sentence is stated and it matches the ticket.
 
 acceptance-criteria-checked:
-	Quote each acceptance criterion the ticket states, one per line. A regression issue from `main-tests-green` has one criterion per failing status context or command: it passes. A stalled pull request from `stalled-prs-checked` has the criteria of the issue it closes, plus: every check that stalled it passes.
+	Quote each acceptance criterion the ticket states, one per line.
+	A regression issue from `main-tests-green` has one criterion per failing status context, in the form "`<context>` reports `success`", and one per failing command, in the form "`<command>` exits 0".
+	A stalled pull request from `stalled-prs-checked` has the criteria of the issue it closes, plus one per reason it stalled: "`<check>` concludes `SUCCESS`" for each failed check, "`mergeable` is `MERGEABLE`" for a conflict, and "each comment from that bot review is fixed or deferred" for a late bot review.
 	Mark each criterion `testable` or `too broad`. A criterion is `too broad` when any of these is true:
 	- It joins requirements that could each pass or fail on their own, using a conjunction such as "and", "or", "as well as", or a list.
 	- It uses a vague term, such as "fast", "robust", "easy", "appropriate", "properly", "better", or "user-friendly", with no measurable threshold.
