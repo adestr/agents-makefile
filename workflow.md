@@ -132,7 +132,8 @@ acceptance-criteria-checked:
 	Satisfied when: every stated criterion is quoted and marked, each `too broad` criterion has a reason and a proposed rewrite, and either a proposed list or one of those statements is given when the ticket has none.
 
 human-criteria-approval:
-	If every stated criterion is `testable`, or "no acceptance criteria; no runtime behavior" was stated, continue without stopping. The quoted criteria are the accepted criteria.
+	If the ticket stated at least one acceptance criterion and every stated criterion is `testable`, continue without stopping. The quoted criteria are the accepted criteria.
+	If "no acceptance criteria; no runtime behavior" was stated, continue without stopping. The accepted criteria are empty.
 	Otherwise present the full list that work would proceed against: each `testable` criterion as quoted, and each proposed rewrite or proposed criterion.
 	If the ticket stated no acceptance criteria, ask the human to choose: stop work on this ticket, or accept that list.
 	Otherwise stop and ask the human to accept that list.
