@@ -4,7 +4,8 @@
 # throw on their stderr under ErrorActionPreference Stop.
 
 $Branch = 'main'
-$ScriptDir = $PSScriptRoot
+$MarkerOpen = '<!-- [begin] Evenlode Agentic Workflow [begin] -->'
+$MarkerClose = '<!-- [-end-] Evenlode Agentic Workflow [-end-] -->'
 
 $script:eligible = $true
 function Pass($message) { Write-Output "PASS  $message" }
@@ -18,7 +19,7 @@ function Invoke-GhJson([string[]]$ghArgs) {
 	return ($output -join "`n") | ConvertFrom-Json
 }
 
-# Check the superproject when run from inside the submodule, as the Makefile does.
+# Prefer the superproject when this checkout is still a git submodule.
 $root = git rev-parse --show-superproject-working-tree 2>$null
 if (-not $root) { $root = git rev-parse --show-toplevel 2>$null }
 if (-not $root) { Stop-Check 'not inside a git repository' }
@@ -82,19 +83,16 @@ $workflows = @(Get-ChildItem -Path '.github/workflows' -File -ErrorAction Silent
 if ($workflows.Count -gt 0) { Pass 'GitHub Actions workflows found' }
 else { Warn 'no .github/workflows; required checks must come from another CI' }
 
-$makefile = Get-Content (Join-Path $ScriptDir 'Makefile')
-$markerOpen = ($makefile | Select-String -Pattern '^MARKER_OPEN := (.*)$').Matches[0].Groups[1].Value
-$markerClose = ($makefile | Select-String -Pattern '^MARKER_CLOSE := (.*)$').Matches[0].Groups[1].Value
 $agents = if (Test-Path AGENTS.md) { @(Get-Content AGENTS.md) } else { @() }
-if ($agents -notcontains $markerOpen) {
-	Warn "AGENTS.md has no workflow block; run make workflow in $(Split-Path $ScriptDir -Leaf)"
+if ($agents -notcontains $MarkerOpen) {
+	Warn 'AGENTS.md has no workflow block; run ./.agents-makefile/sync.sh (or: curl -fsSL https://raw.githubusercontent.com/adestr/agents-makefile/main/sync.sh | bash)'
 }
 else {
 	$inBlock = $false
 	$notes = $false
 	foreach ($line in $agents) {
-		if ($line -ceq $markerOpen) { $inBlock = $true; continue }
-		if ($line -ceq $markerClose) { $inBlock = $false; continue }
+		if ($line -ceq $MarkerOpen) { $inBlock = $true; continue }
+		if ($line -ceq $MarkerClose) { $inBlock = $false; continue }
 		if (-not $inBlock -and $line.Trim()) { $notes = $true }
 	}
 	if ($notes) { Pass 'AGENTS.md has the workflow block and repository notes' }

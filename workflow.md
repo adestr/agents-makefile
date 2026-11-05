@@ -1,5 +1,5 @@
 <!-- This workflow is automatically inserted into your AGENTS.md file, please do not edit it directly -->
-<!-- To update the workflow, run `make workflow` inside ./agents-makefile -->
+<!-- To update the workflow, run `./.agents-makefile/sync.sh` from the repository root -->
 
 # Agent Workflow
 
@@ -114,7 +114,7 @@ stalled-prs-checked:
 	Satisfied when: "regression is the ticket" is stated, or "no stalled pull requests" is stated, or the stalled pull request has auto-merge disabled, is the ticket, and the human has been told that.
 
 repo-health-checked:
-	From the repository root, run `./agents-makefile/health-check.sh`, or `./agents-makefile/health-check.ps1` on Windows. Use the path of this repository's agents-makefile submodule if it lives elsewhere.
+	From the repository root, run `./.agents-makefile/health-check.sh`, or `./.agents-makefile/health-check.ps1` on Windows.
 	Show each `FAIL` and `WARN` line to the human. Do not change repository settings, rulesets, or CI to clear them.
 	The last line, `auto-merge: eligible` or `auto-merge: not eligible`, decides whether `human-commit-approval` may offer `ship`.
 	If the script is missing or exits 2, say "health check unavailable". `ship` is then not offered.

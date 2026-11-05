@@ -4,7 +4,8 @@
 set -u
 
 BRANCH=main
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+MARKER_OPEN='<!-- [begin] Evenlode Agentic Workflow [begin] -->'
+MARKER_CLOSE='<!-- [-end-] Evenlode Agentic Workflow [-end-] -->'
 
 eligible=1
 pass() { printf 'PASS  %s\n' "$1"; }
@@ -12,7 +13,7 @@ warn() { printf 'WARN  %s\n' "$1"; }
 fail() { printf 'FAIL  %s\n' "$1"; eligible=0; }
 error() { printf 'ERROR %s\n' "$1"; exit 2; }
 
-# Check the superproject when run from inside the submodule, as the Makefile does.
+# Prefer the superproject when this checkout is still a git submodule.
 root=$(git rev-parse --show-superproject-working-tree 2>/dev/null)
 [ -n "$root" ] || root=$(git rev-parse --show-toplevel 2>/dev/null) || error "not inside a git repository"
 cd "$root" || error "cannot enter $root"
@@ -76,10 +77,9 @@ else
 	warn "no .github/workflows; required checks must come from another CI"
 fi
 
-marker=$(sed -n 's/^MARKER_OPEN := //p' "$SCRIPT_DIR/Makefile")
-if [ ! -f AGENTS.md ] || ! grep -Fqx "$marker" AGENTS.md; then
-	warn "AGENTS.md has no workflow block; run make workflow in $(basename "$SCRIPT_DIR")"
-elif ! awk -v open="$marker" -v close="$(sed -n 's/^MARKER_CLOSE := //p' "$SCRIPT_DIR/Makefile")" '
+if [ ! -f AGENTS.md ] || ! grep -Fqx "$MARKER_OPEN" AGENTS.md; then
+	warn "AGENTS.md has no workflow block; run ./.agents-makefile/sync.sh (or: curl -fsSL https://raw.githubusercontent.com/adestr/agents-makefile/main/sync.sh | bash)"
+elif ! awk -v open="$MARKER_OPEN" -v close="$MARKER_CLOSE" '
 		$0 == open { inblock = 1; next }
 		$0 == close { inblock = 0; next }
 		!inblock && NF { found = 1 }
