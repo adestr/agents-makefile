@@ -10,7 +10,7 @@ The workflow is a Makefile-style DAG. The active target is `finish` unless the h
    - Stop only when the next target is a `human-*-approval` gate that is not already satisfied, or when the stage just finished makes an earlier gate unsatisfied. `triaged-blockers` and `all-bots-triaged` name that backward move.
    - On a human gate, ask for the approval that gate's **Satisfied when** line requires. Do not treat "Continue" as that approval.
 3. A target is satisfied only when its **Satisfied when** condition is true.
-4. A human gate is satisfied only when the human's latest message explicitly approves the artifact that gate presented. Approval of a different gate does not count, except that choosing `ship` at `human-commit-approval` also satisfies `human-push-approval` and `human-landing-approval` for that commit. If the human asks for a change, that gate is unsatisfied and the target that produced the artifact is unsatisfied too.
+4. A human gate is satisfied only when the human's latest message explicitly approves the artifact that gate presented. Approval of a different gate does not count, except that choosing `ship` at `human-commit-approval` also satisfies `human-push-approval` and `human-landing-approval` for that commit. If the human asks for a change, that gate is unsatisfied and the target that produced the artifact is unsatisfied too. If the human chooses to stop work at `human-criteria-approval`, the run ends there; do not continue to any later target.
 5. Do not add a target, skip a target, or choose a different unsatisfied prerequisite than the leftmost one.
 6. Lines under a target are instructions. A line in backticks is a command.
 7. Do not commit, push, merge, enable or disable auto-merge, check out another branch, or delete branches except where `branch-created`, `main-tests-green`, `stalled-prs-checked`, `commit`, `push`, `land`, or `pristine-workbench` says to.
@@ -28,8 +28,8 @@ Coding practice is enforced by `tdd-failing-repro`, `implementation-diff`, `adve
 	clean-static-analysis doc-audit-complete human-review-approval \
 	triaged-blockers adversarial-review human-diff-approval \
 	implementation-diff tdd-failing-repro baseline-tests-pass approved-plan human-plan-approval \
-	researched-ticket branch-created candidate-scars git-archaeology main-tests-green ticket-assigned \
-	stalled-prs-checked repo-health-checked
+	researched-ticket branch-created candidate-scars git-archaeology human-criteria-approval \
+	acceptance-criteria-checked main-tests-green ticket-assigned stalled-prs-checked repo-health-checked
 
 finish: pristine-workbench
 pristine-workbench: codified-scars-consolidated
@@ -56,7 +56,9 @@ tdd-failing-repro: approved-plan
 approved-plan: human-plan-approval
 human-plan-approval: researched-ticket
 researched-ticket: branch-created candidate-scars git-archaeology
-branch-created: ticket-assigned
+branch-created: human-criteria-approval
+human-criteria-approval: acceptance-criteria-checked
+acceptance-criteria-checked: ticket-assigned
 candidate-scars: branch-created
 git-archaeology: branch-created
 clean-static-analysis: human-diff-approval
@@ -118,6 +120,28 @@ ticket-assigned:
 	Otherwise the human's message is the ticket when it names that outcome. Do not invent a tracker id.
 	Satisfied when: that sentence is stated and it matches the ticket.
 
+acceptance-criteria-checked:
+	Quote each acceptance criterion the ticket states, one per line.
+	A regression issue from `main-tests-green` has one criterion per failing status context, in the form "`<context>` reports `success`", and one per failing command, in the form "`<command>` exits 0".
+	A stalled pull request from `stalled-prs-checked` has the criteria of the issue it closes, plus one per reason it stalled: "`<check>` concludes `SUCCESS`" for each failed check, "`mergeable` is `MERGEABLE`" for a conflict, and "each comment from that bot review is fixed or deferred" for a late bot review.
+	Mark each criterion `testable` or `too broad`. A criterion is `too broad` when any of these is true:
+	- It joins requirements that could each pass or fail on their own, using a conjunction such as "and", "or", "as well as", or a list.
+	- It uses a vague term, such as "fast", "robust", "easy", "appropriate", "properly", "better", or "user-friendly", with no measurable threshold.
+	- No automated or scripted check could be written whose pass or fail decides it.
+	For each `too broad` criterion, give the reason and propose a rewrite as one or more `testable` criteria.
+	If the ticket states no acceptance criteria and it changes runtime behavior, say "no acceptance criteria" and propose a `testable` list that covers the ticket sentence.
+	If the ticket states no acceptance criteria and it changes no runtime behavior, say "no acceptance criteria; no runtime behavior".
+	Satisfied when: every stated criterion is quoted and marked, each `too broad` criterion has a reason and a proposed rewrite, and either a proposed list or one of those statements is given when the ticket has none.
+
+human-criteria-approval:
+	If the ticket stated at least one acceptance criterion and every stated criterion is `testable`, continue without stopping. The quoted criteria are the accepted criteria.
+	If "no acceptance criteria; no runtime behavior" was stated, continue without stopping. The accepted criteria are empty.
+	Otherwise present the full list that work would proceed against: each `testable` criterion as quoted, and each proposed rewrite or proposed criterion.
+	If the ticket stated no acceptance criteria, ask the human to choose: stop work on this ticket, or accept that list.
+	Otherwise stop and ask the human to accept that list.
+	Do not create a branch or edit the tree before this gate is satisfied.
+	Satisfied when: no criterion was `too broad` and the ticket was not missing criteria for a runtime behavior change, or the human's latest message explicitly accepts the presented list, which becomes the accepted criteria. If the human chooses to stop, the run ends.
+
 branch-created:
 	Name the working branch `[prefix]/[issue number]-[terse kebab-case issue summary]`.
 	Use the prefix `fix` when the issue is labelled `bug` or `regression`, and `feat` otherwise.
@@ -140,12 +164,12 @@ git-archaeology:
 	Satisfied when: the notes name those paths and what the current behavior is, with the commit subjects that establish it.
 
 researched-ticket:
-	Write the research note: the ticket sentence, the scar result, and the archaeology result.
+	Write the research note: the ticket sentence, the accepted criteria from `human-criteria-approval`, the scar result, and the archaeology result.
 	State the constraints you found in the code you read. Do not edit the tree.
-	Satisfied when: the note includes all three inputs and those constraints.
+	Satisfied when: the note includes all four inputs and those constraints.
 
 human-plan-approval:
-	Present the plan that follows from the research note. Include the files to change, the behavior change, the test that will prove it, and the work you will not do.
+	Present the plan that follows from the research note. Include the files to change, the behavior change, the test that will prove each accepted criterion that describes runtime behavior, and the work you will not do.
 	Stop and ask the human to accept this plan.
 	Satisfied when: the human's latest message explicitly accepts that plan.
 
@@ -157,16 +181,16 @@ approved-plan:
 tdd-failing-repro:
 	If the accepted plan changes no runtime behavior, add no test. Say "no runtime behavior; no test added".
 	If the commands in `baseline-tests-pass` do not apply, add no test. Say "no test command; no test added".
-	If the accepted plan changes runtime behavior, add a test that fails because that behavior is missing. Do not edit production code in this step.
-	Run the commands from `baseline-tests-pass` and show the failing assertion of the new test.
-	Satisfied when: the new test's failure output is shown, or "no test command; no test added" is stated, or "no runtime behavior; no test added" is stated.
+	If the accepted plan changes runtime behavior, add the tests the plan names, so that each accepted criterion describing runtime behavior has at least one test that fails because that behavior is missing. Do not edit production code in this step.
+	Run the commands from `baseline-tests-pass` and show the failing assertion of each new test.
+	Satisfied when: each new test's failure output is shown, or "no test command; no test added" is stated, or "no runtime behavior; no test added" is stated.
 
 implementation-diff:
-	Change only the files named in the accepted plan, and only enough to make the failing test pass or to apply the docs-only plan.
+	Change only the files named in the accepted plan, and only enough to make the failing tests pass or to apply the docs-only plan.
 	Keep one source for each rule. Take new dependencies from existing constructors or parameters. Do not add a type, parameter, or wrapper the plan does not use.
-	Run the same test command as `tdd-failing-repro` when a test was added, and show it passing.
+	Run the same test command as `tdd-failing-repro` when tests were added, and show them passing.
 	Show `git diff`. Do not commit.
-	Satisfied when: the diff matches the accepted plan and the new test passes, or the docs-only diff is shown.
+	Satisfied when: the diff matches the accepted plan and every new test passes, or the docs-only diff is shown.
 
 human-diff-approval:
 	Present `git diff` and a short summary of what changed.
@@ -187,8 +211,10 @@ adversarial-review:
 	- KISS: the diff adds an indirection that only forwards to one callee.
 	- Errors: a failure is ignored, logged and then treated as success, or returned as a success value.
 	- Tests: runtime behavior changed and removing that behavior would not fail a test.
+	- Criteria: an accepted criterion from `human-criteria-approval` describes runtime behavior, and no test in the tree would fail if the diff did not meet it. If `tdd-failing-repro` stated "no test command; no test added", this check does not apply.
 	- Scope: the diff changes a file or behavior the accepted plan did not name.
 	- Boundaries: the diff couples components across a boundary this repository records outside this workflow block, and the plan did not name that coupling. If this repository records no such boundary, this check does not apply.
+	The report also lists each accepted criterion that describes runtime behavior with the test that covers it.
 	A `note` is a naming or wording issue that no check in `clean-static-analysis` enforces. Do not edit the diff to clear a note.
 	If nothing matches, the report is `no findings`.
 	Satisfied when: the report is shown.
