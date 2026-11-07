@@ -173,10 +173,11 @@ human-criteria-approval:
 
 acceptance-criteria-recorded:
 	If `assignee-checked` stated "no issue to assign", say "no issue to update" and stop.
-	If the accepted criteria are empty, or every stated criterion was already `testable`, say "criteria unchanged" and stop.
+ 	If the accepted criteria are empty, say "no criteria defined" and stop.
+ 	If the ticket stated at least one acceptance criterion and every stated criterion was already `testable`, say "criteria unchanged" and stop.
 	Otherwise the accepted criteria differ from what the ticket stated. Read the issue body with `gh issue view <issue> --json body --jq .body`.
-	Build a new body that keeps every part of the current body outside an `## Acceptance criteria` section, and sets that section to one `- ` bullet per accepted criterion. If the current body has no such section, append it after the existing body, separated by a blank line.
-	Write the body with `gh issue edit <issue> --body <body>`.
+	Build a new body that keeps every part of the current body outside an `## Acceptance criteria` section, and sets that section to one `- []` bullet per accepted criterion. If the current body has no such section, append it after the existing body, separated by a blank line.
+ 	Write the body with `gh issue edit <issue> --body <body>`.
 	Do not create a branch or edit the tree in this step.
 	Satisfied when: "no issue to update" or "criteria unchanged" is stated, or `gh issue view <issue> --json body --jq .body` shows an `## Acceptance criteria` section whose bullets are exactly the accepted criteria.
 
